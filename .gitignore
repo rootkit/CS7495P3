@@ -4,6 +4,10 @@ lib/
 bin/
 exe/
 
+# User Files
+*.usr
+*.user
+
 # Temp files
 *~
 *.swp

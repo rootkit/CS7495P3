@@ -64,7 +64,7 @@ public:
 
 	void TestImageSegmentation()
 	{
-		cv::Mat imgRead = cv::imread("/home/arprice/Desktop/cat.jpg");
+		cv::Mat imgRead = cv::imread("/home/rox/Downloads/cat-08.jpg");
 //		cv::resize(imgRead, imgRead, cv::Size(640, 480));
 
 		cv::namedWindow("Hello", cv::WINDOW_NORMAL);

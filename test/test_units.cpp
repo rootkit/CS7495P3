@@ -10,8 +10,6 @@
 #include <cppunit/extensions/TestFactoryRegistry.h>
 #include <cppunit/ui/text/TextTestRunner.h>
 
-#include <boost/thread/thread.hpp>
-
 #include <iostream>
 #include <string>
 
