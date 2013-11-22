@@ -64,7 +64,7 @@ public:
 
 	void TestImageSegmentation()
 	{
-		cv::Mat imgRead = cv::imread("/home/arprice/Desktop/platypus.jpg");
+		cv::Mat imgRead = cv::imread("/home/arprice/Desktop/cat.jpg");
 		if (imgRead.rows * imgRead.cols > 200000)
 		{
 			cv::resize(imgRead, imgRead,  cv::Size(imgRead.cols / 2, imgRead.rows / 2));
@@ -109,24 +109,19 @@ public:
 		cv::waitKey();
 
 		cv::namedWindow("Final", cv::WINDOW_NORMAL);
-		cv::namedWindow("FinalHSV", cv::WINDOW_NORMAL);
 
-		cv::Mat display, displayHSV;
+		cv::Mat display;
+
+		cv::Mat imgHSV;
+		cv::cvtColor(img, imgHSV, CV_BGR2HSV);
 
 		ap::Segmentation s;
 		for (int i = 10; i < 6000; i *= 5)
 		{
-			cv::Mat imgHSV;
-			cv::cvtColor(img, imgHSV, CV_BGR2HSV);
-
-			ap::segmentFelzenszwalb(img, s, (img.rows * img.cols) / i, (img.rows * img.cols) / 500, &ap::diffSTD);
+			ap::segmentFelzenszwalb(img, s, (img.rows * img.cols) / i, (img.rows * img.cols) / 500, &ap::diffHSV);
 			ap::recolorSegmentation(img, display, s, true);
 
-			ap::segmentFelzenszwalb(img, s, (img.rows * img.cols) / i, (img.rows * img.cols) / 500, &ap::diffHSV);
-			ap::recolorSegmentation(img, displayHSV, s, true);
-
-			cv::imshow("Final", display);
-			cv::imshow("FinalHSV", displayHSV);
+			cv::imshow("Final" + std::to_string(i), display);
 			cv::waitKey();
 		}
 	}

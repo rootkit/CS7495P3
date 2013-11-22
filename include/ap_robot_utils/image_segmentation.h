@@ -38,7 +38,6 @@
 #ifndef IMAGESEGMENTATION_H
 #define IMAGESEGMENTATION_H
 
-
 #include <opencv2/core/core.hpp>
 
 namespace ap

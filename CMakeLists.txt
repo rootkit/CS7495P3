@@ -1,8 +1,8 @@
 cmake_minimum_required(VERSION 2.8.3)
 project(fuzzy_opj)
 set(BUILD_FLAGS "-std=c++0x -Wreturn-type")
-#SET(CMAKE_BUILD_TYPE "Release")
-SET(CMAKE_BUILD_TYPE "Debug")
+SET(CMAKE_BUILD_TYPE "Release")
+#SET(CMAKE_BUILD_TYPE "Debug")
 
 # Add additional CMake files
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_CURRENT_SOURCE_DIR}/cmake/")
@@ -11,6 +11,10 @@ set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_CURRENT_SOURCE_DIR}/cmake/")
 find_package(OpenCV REQUIRED)
 include_directories(${OpenCV_INCLUDE_DIR})
 link_libraries(${OpenCV_LIBS})
+
+find_package(KAZE REQUIRED)
+include_directories(${KAZE_INCLUDE_DIR})
+link_libraries(${KAZE_LIBRARIES})
 
 find_package(CppUnit)
 include_directories(${CPPUNIT_INCLUDE_DIR})
@@ -22,8 +26,7 @@ link_libraries(${CPPUNIT_LIBRARIES})
 
 ## Specify additional locations of header files
 ## Your package locations should be listed before other locations
-include_directories(include ${catkin_INCLUDE_DIRS})
-link_libraries(${catkin_LIBRARIES})
+include_directories(include)
 
 file(GLOB felz_source "src/libraries/felzenszwalb/*.h")
 include_directories("src/libraries/felzenszwalb")
