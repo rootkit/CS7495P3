@@ -33,6 +33,8 @@ include_directories("src/libraries/felzenszwalb")
 ## Declare a cpp library
 add_library(${PROJECT_NAME}
   src/libraries/image_segmentation.cpp
+  src/libraries/KazeFeatureDetector.cpp
+  src/libraries/KazeDescriptorExtractor.cpp
   ${felz_source})
 
 #############

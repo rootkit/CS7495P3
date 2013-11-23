@@ -47,10 +47,15 @@
 #include <opencv2/highgui/highgui.hpp>
 #include <opencv2/imgproc/imgproc.hpp>
 
+#include "KazeFeatureDetector.h"
+#include "KazeDescriptorExtractor.h"
+
 class TestKaze : public CppUnit::TestFixture
 {
 	CPPUNIT_TEST_SUITE( TestKaze );
 	CPPUNIT_TEST(TestFeatureExtraction);
+	CPPUNIT_TEST(TestOpenCVCompliance);
+	CPPUNIT_TEST(TestReuse);
 	CPPUNIT_TEST_SUITE_END();
 public:
 
@@ -61,7 +66,7 @@ public:
 
 	virtual void tearDown () {}
 
-	void defaultOptions(toptions& options)
+	static void defaultOptions(toptions& options)
 	{
 		options.soffset = DEFAULT_SCALE_OFFSET;
 		options.omax = DEFAULT_OCTAVE_MAX;
@@ -133,6 +138,65 @@ public:
 
 	}
 
+	void TestOpenCVCompliance()
+	{
+		cv::Mat img;
+
+		img = cv::imread("/home/arprice/Desktop/cat.jpg", 0);
+		CPPUNIT_ASSERT(img.data != NULL);
+
+		cv::FeatureDetector* detector = new cv::KazeFeatureDetector();
+		cv::DescriptorExtractor* extractor = new cv::KazeDescriptorExtractor();
+		std::vector<cv::KeyPoint> keypoints;
+		cv::Mat descriptors;
+
+		detector->detect(img, keypoints);
+		extractor->compute(img, keypoints, descriptors);
+
+		cv::drawKeypoints(img, keypoints, img);
+
+		cv::imshow("Image",img);
+		cv::waitKey(0);
+
+		cv::destroyAllWindows();
+	}
+
+	void TestReuse()
+	{
+		cv::Mat img;
+
+		img = cv::imread("/home/arprice/Desktop/cat.jpg", 0);
+		CPPUNIT_ASSERT(img.data != NULL);
+
+		cv::KazeFeatureDetector* detector = new cv::KazeFeatureDetector();
+		cv::KazeDescriptorExtractor* extractor = new cv::KazeDescriptorExtractor();
+		std::vector<cv::KeyPoint> keypoints;
+		cv::Mat descriptors;
+
+		toptions options;
+		defaultOptions(options);
+		options.img_width = img.cols;
+		options.img_height = img.rows;
+
+		boost::shared_ptr<KAZE> evolution(new KAZE(options));
+
+		cv::Mat img_32;
+		img.convertTo(img_32,CV_32F,1.0/255.0,0);
+
+		evolution->Create_Nonlinear_Scale_Space(img_32);
+		detector->preloadEnvironment(evolution);
+		extractor->preloadEnvironment(evolution);
+
+		detector->detect(img, keypoints);
+		extractor->compute(img, keypoints, descriptors);
+
+		cv::drawKeypoints(img, keypoints, img);
+
+		cv::imshow("Image",img);
+		cv::waitKey(0);
+
+		cv::destroyAllWindows();
+	}
 
 };
 
