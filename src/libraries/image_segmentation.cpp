@@ -123,16 +123,28 @@ void segmentFelzenszwalb(const cv::Mat& input, Segmentation& s, const float c, u
 	{
 		int a = u->find(edges[i].a);
 		int b = u->find(edges[i].b);
-		if ((a != b) && ((u->size(a) < min_size) || (u->size(b) < min_size)))
-			u->join(a, b);
+		if ((a != b))
+		{
+			// Join if too small
+			if ((u->size(a) < min_size) || (u->size(b) < min_size))
+			{
+				u->join(a, b);
+			}
+			else
+			{
+				// Add to edge image
+				s.edges.data[edges[i].a] = 255;
+				s.edges.data[edges[i].b] = 255;
+			}
+		}
 	}
 
 	// Create the segment containers
-	s.clear();
+	s.segmentToPixels.clear();
 	for (int comps = 0; comps < u->num_sets(); ++comps)
 	{
 		Segment temp;
-		s.push_back(temp);
+		s.segmentToPixels.push_back(temp);
 	}
 
 	std::map<int, int> componentMap;
@@ -159,7 +171,11 @@ void segmentFelzenszwalb(const cv::Mat& input, Segmentation& s, const float c, u
 
 			assert(targetComponent < u->num_sets());
 
-			s[targetComponent].push_back(cv::Point2i(x, y));
+			// Add pixel to segment's collection
+			s.segmentToPixels[targetComponent].push_back(cv::Point2i(x, y));
+
+			// Add pixel to segment image
+			s.pixelsToSegment.data[x + y * width] = targetComponent;
 		}
 	}
 
@@ -167,25 +183,25 @@ void segmentFelzenszwalb(const cv::Mat& input, Segmentation& s, const float c, u
 	delete u;
 }
 
-void recolorSegmentation(const cv::Mat& colorIm, cv::Mat& recolorIm, const Segmentation &s, bool useAverageColor)
+void recolorSegmentation(const cv::Mat& colorIm, cv::Mat& recolorIm, const Segmentation &s, bool useAverageColor, bool drawEdges)
 {
 	assert(colorIm.data != recolorIm.data);
 
 	recolorIm = cv::Mat(colorIm.rows, colorIm.cols, colorIm.type());
 
-	for (int comp = 0; comp < s.size(); ++comp)
+	for (int comp = 0; comp < s.segmentToPixels.size(); ++comp)
 	{
 		cv::Vec3b color;
 		if (useAverageColor)
 		{
 			cv::Vec3f tempColor = cv::Vec3f(0,0,0);
-			for (int element = 0; element < s[comp].size(); ++element)
+			for (int element = 0; element < s.segmentToPixels[comp].size(); ++element)
 			{
-				cv::Point2i p = s[comp][element];
+				cv::Point2i p = s.segmentToPixels[comp][element];
 				assert(p.x + (p.y * colorIm.cols) < colorIm.rows * colorIm.cols);
 				tempColor += colorIm.at<cv::Vec3b>(p);
 			}
-			color = tempColor / (float)s[comp].size();
+			color = tempColor / (float)s.segmentToPixels[comp].size();
 		}
 		else
 		{
@@ -194,11 +210,18 @@ void recolorSegmentation(const cv::Mat& colorIm, cv::Mat& recolorIm, const Segme
 		}
 
 		// Assign all elements of this component to this color
-		for (int element = 0; element < s[comp].size(); ++element)
+		for (int element = 0; element < s.segmentToPixels[comp].size(); ++element)
 		{
-			cv::Point2i p = s[comp][element];
+			cv::Point2i p = s.segmentToPixels[comp][element];
 			assert(p.x + (p.y * colorIm.cols) < colorIm.rows * colorIm.cols);
-			recolorIm.at<cv::Vec3b>(p) = color;
+			if (drawEdges && s.edges.at<unsigned char>(p) != 0)
+			{
+				recolorIm.at<cv::Vec3b>(p) = cv::Vec3b(0,0,0);
+			}
+			else
+			{
+				recolorIm.at<cv::Vec3b>(p) = color;
+			}
 		}
 	}
 }

@@ -44,7 +44,20 @@ namespace ap
 {
 
 typedef std::vector<cv::Point2i> Segment;
-typedef std::vector<Segment> Segmentation;
+
+class Segmentation
+{
+public:
+	Segmentation(cv::Size2i size)
+	{
+		pixelsToSegment = cv::Mat1i(size, 0);
+		edges = cv::Mat1b(size, 0);
+	}
+
+	std::vector<Segment> segmentToPixels;
+	cv::Mat1i pixelsToSegment;
+	cv::Mat1b edges;
+};
 
 typedef float (*DifferenceFunction)(const cv::Mat& image, int x1, int y1, int x2, int y2);
 
@@ -53,7 +66,7 @@ float diffHSV(const cv::Mat& image, int x1, int y1, int x2, int y2);
 
 void segmentFelzenszwalb(const cv::Mat& input, Segmentation& s, const float c, unsigned int min_size, DifferenceFunction diff = &diffSTD);
 
-void recolorSegmentation(const cv::Mat& colorIm, cv::Mat& recolorIm, const Segmentation &s, bool useAverageColor = false);
+void recolorSegmentation(const cv::Mat& colorIm, cv::Mat& recolorIm, const Segmentation &s, bool useAverageColor = false, bool drawEdges = true);
 
 }
 

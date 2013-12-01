@@ -108,14 +108,12 @@ public:
 		cv::imshow("Original", img);
 		cv::waitKey();
 
-		cv::namedWindow("Final", cv::WINDOW_NORMAL);
-
 		cv::Mat display;
 
 		cv::Mat imgHSV;
 		cv::cvtColor(img, imgHSV, CV_BGR2HSV);
 
-		ap::Segmentation s;
+		ap::Segmentation s(img.size());
 		for (int i = 10; i < 6000; i *= 5)
 		{
 			ap::segmentFelzenszwalb(img, s, (img.rows * img.cols) / i, (img.rows * img.cols) / 500, &ap::diffHSV);
