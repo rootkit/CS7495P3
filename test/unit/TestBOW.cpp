@@ -1,5 +1,5 @@
 /**
- * \file KazeDescriptorExtractor.h
+ * \file TestBOW.cpp
  * \brief
  *
  * \author Andrew Price
@@ -38,37 +38,60 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef KAZEDESCRIPTOREXTRACTOR_H
-#define KAZEDESCRIPTOREXTRACTOR_H
 
+#include <cppunit/TestFixture.h>
+#include <cppunit/extensions/HelperMacros.h>
+
+#include <opencv2/highgui/highgui.hpp>
+#include <opencv2/imgproc/imgproc.hpp>
 #include <opencv2/features2d/features2d.hpp>
-#include <boost/shared_ptr.hpp>
+#include <opencv2/nonfree/nonfree.hpp>
 
-#include <KAZE.h>
-
-namespace cv
+class TestBoW : public CppUnit::TestFixture
 {
-
-class KazeDescriptorExtractor : public DescriptorExtractor
-{
+	CPPUNIT_TEST_SUITE( TestBoW );
+	CPPUNIT_TEST(TestCluster);
+	CPPUNIT_TEST_SUITE_END();
 public:
-	KazeDescriptorExtractor();
 
-	//virtual void read( const FileNode& );
-	//virtual void write( FileStorage& ) const;
-	virtual int descriptorSize() const { return 64; }
-	virtual int descriptorType() const { return 42; }
+	virtual void setUp()
+	{
+		srand(10);
+		cv::initModule_nonfree();
+		cv::initModule_features2d();
+	}
 
-	typedef boost::shared_ptr<KAZE> KazePtr;
+	virtual void tearDown () {}
 
-	void preloadEnvironment(KazePtr& e);
+	cv::Mat trainVocabulary(const std::vector<cv::Mat>& templates,
+							const cv::Ptr<cv::FeatureDetector> detector,
+							const cv::Ptr<cv::DescriptorExtractor> extractor,
+							cv::Ptr<cv::BOWTrainer> trainer)
+	{
+		// Use templates to train a vocabulary
+		cv::Mat desc;
+		for(cv::Mat temp : templates)
+		{
+			std::vector<cv::KeyPoint> kp;
+			detector->detect(temp, kp);
+			extractor->compute(temp, kp, desc);
+			trainer->add(desc);
+		}
 
-protected:
-	virtual void computeImpl( const Mat& image, vector<KeyPoint>& keypoints, Mat& descriptors ) const;
+		return trainer->cluster();
+	}
 
-	bool usePreloadedEnvironment;
-	KazePtr environment;
+	void TestCluster()
+	{
+		cv::Ptr<cv::FeatureDetector> detector(new cv::SiftFeatureDetector());
+		cv::Ptr<cv::DescriptorExtractor> extractor(new cv::SiftDescriptorExtractor());
+		cv::Ptr<cv::DescriptorMatcher> matcher(new cv::FlannBasedMatcher());
+
+		cv::Ptr<cv::BOWTrainer> trainer(new cv::BOWKMeansTrainer(5));
+		cv::Ptr<cv::BOWImgDescriptorExtractor> imgExtractor(new cv::BOWImgDescriptorExtractor(extractor, matcher));
+
+
+	}
 };
 
-}
-#endif // KAZEDESCRIPTOREXTRACTOR_H
+CPPUNIT_TEST_SUITE_REGISTRATION(TestBoW);
