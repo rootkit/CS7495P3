@@ -83,13 +83,24 @@ void KazeFeatureDetector::detectImpl( const Mat& image, vector<KeyPoint>& keypoi
 		options.img_width = image.cols;
 		options.img_height = image.rows;
 
+		std::cerr << "Creating KAZE Evolution." << std::endl;
 		KAZE evolution(options);
 
 		cv::Mat img_32;
-		image.convertTo(img_32,CV_32F,1.0/255.0,0);
+		cv::Mat bw;
+		if (image.channels() == 1)
+		{
+			image.convertTo(img_32,CV_32F,1.0/255.0,0);
+		}
+		else
+		{
+			cv::cvtColor(image, bw, CV_RGB2GRAY);
+			bw.convertTo(img_32,CV_32F,1.0/255.0,0);
+		}
 
+		std::cerr << "Creating NLSS." << std::endl;
 		evolution.Create_Nonlinear_Scale_Space(img_32);
-
+		std::cerr << "Detecting Features." << std::endl;
 		evolution.Feature_Detection(keypoints);
 	}
 }

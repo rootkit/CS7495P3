@@ -86,7 +86,16 @@ void KazeDescriptorExtractor::computeImpl( const Mat& image, vector<KeyPoint>& k
 		KAZE evolution(options);
 
 		cv::Mat img_32;
-		image.convertTo(img_32,CV_32F,1.0/255.0,0);
+		cv::Mat bw;
+		if (image.channels() == 1)
+		{
+			image.convertTo(img_32,CV_32F,1.0/255.0,0);
+		}
+		else
+		{
+			cv::cvtColor(image, bw, CV_RGB2GRAY);
+			bw.convertTo(img_32,CV_32F,1.0/255.0,0);
+		}
 
 		evolution.Create_Nonlinear_Scale_Space(img_32);
 
