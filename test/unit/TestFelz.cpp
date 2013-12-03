@@ -64,7 +64,7 @@ public:
 
 	void TestImageSegmentation()
 	{
-		cv::Mat imgRead = cv::imread("/home/arprice/Desktop/cat.jpg");
+		cv::Mat imgRead = cv::imread("/home/arprice/Desktop/platypus.jpg");
 		if (imgRead.rows * imgRead.cols > 200000)
 		{
 			cv::resize(imgRead, imgRead,  cv::Size(imgRead.cols / 2, imgRead.rows / 2));

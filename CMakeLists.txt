@@ -1,8 +1,8 @@
 cmake_minimum_required(VERSION 2.8.3)
 project(fuzzy_opj)
 set(BUILD_FLAGS "-std=c++0x -Wreturn-type")
-#SET(CMAKE_BUILD_TYPE "Release")
-SET(CMAKE_BUILD_TYPE "Debug")
+SET(CMAKE_BUILD_TYPE "Release")
+#SET(CMAKE_BUILD_TYPE "Debug")
 
 # Add additional CMake files
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_CURRENT_SOURCE_DIR}/cmake/")
@@ -42,7 +42,11 @@ add_library(${PROJECT_NAME}
   src/libraries/image_segmentation.cpp
   src/libraries/KazeFeatureDetector.cpp
   src/libraries/KazeDescriptorExtractor.cpp
+  src/libraries/voc_utils.cpp
   ${felz_source})
+
+set_target_properties(${PROJECT_NAME} PROPERTIES COMPILE_FLAGS ${BUILD_FLAGS})
+
 
 #############
 ## Testing ##

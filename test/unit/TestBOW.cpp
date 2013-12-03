@@ -51,11 +51,18 @@
 
 #include <boost/filesystem.hpp>
 
+#include <KazeFeatureDetector.h>
+#include <KazeDescriptorExtractor.h>
+
+#include "voc_utils.h"
+
 const int BOW_FEATURE_SIZE = 16;
 const std::string BASE_PATH = "/home/arprice/Desktop/bow/";
-const std::string TEMPLATES_PATH = "templates/";
-const std::string TRAINING_PATH = "training/";
+//const std::string TEMPLATES_PATH = "templates/";
+//const std::string TRAINING_PATH = "training/";
 const std::string TESTING_PATH = "testing/";
+
+typedef std::map<std::string, std::vector<std::string> > TrainingSet;
 
 class TestBoW : public CppUnit::TestFixture
 {
@@ -73,22 +80,22 @@ public:
 
 	virtual void tearDown () {}
 
-	cv::Mat buildVocabulary(boost::filesystem3::directory_iterator& iter,
+	cv::Mat buildVocabulary(TrainingSet& t,
 							const cv::Ptr<cv::FeatureDetector> detector,
 							const cv::Ptr<cv::DescriptorExtractor> extractor,
 							cv::Ptr<cv::BOWTrainer> trainer,
 							const bool lookForSavedVocab = true,
-							const bool saveTrainedVocab = true)
+							const bool saveTrainedVocab = true,
+							const bool validateKPs = true)
 	{
 		cv::Mat vocabulary;
-		std::string parentPath = iter->path().parent_path().string();
-		std::string vocabPath = parentPath + "/vocab.xml";
+		std::string vocabPath = BASE_PATH + "/vocab.xml";
 
 		// Look for pretrained vocabulary
 		if (lookForSavedVocab && boost::filesystem3::exists(vocabPath))
 		{
 			std::cout << "Loading filesystem vocabulary: " << vocabPath << std::endl;
-			cv::FileStorage fs(iter->path().parent_path().string() + "/vocab.xml", cv::FileStorage::READ);
+			cv::FileStorage fs(vocabPath, cv::FileStorage::READ);
 			fs["vocabulary"] >> vocabulary;
 			fs.release();
 
@@ -97,17 +104,36 @@ public:
 
 		// Use templates to train a vocabulary
 		cv::Mat desc;
-		for (boost::filesystem3::directory_iterator end; iter != end; ++iter)
+		//for (boost::filesystem3::directory_iterator end; iter != end; ++iter)
+		for (TrainingSet::iterator catIter = t.begin();
+			 catIter != t.end(); ++catIter)
 		{
-			if (iter->path().filename().string() == "vocab.xml") {continue;}
-			std::string filename = parentPath + "/" + iter->path().filename().string();
-			cv::Mat temp = cv::imread(filename);
+			for (std::string name : catIter->second)
+			{
+				std::string filename = VOC_FILE_STRUCTURE.imgDir() + "/" + name + ".jpg";
+				cv::Mat temp = cv::imread(filename);
 
-			std::cout << "Loaded: " << filename << " (" << temp.rows << "x" << temp.cols << ")" << std::endl;
-			std::vector<cv::KeyPoint> kp;
-			detector->detect(temp, kp);
-			extractor->compute(temp, kp, desc);
-			trainer->add(desc);
+				assert(temp.rows > 0 && temp.cols > 0);
+
+				std::cout << "Loaded: " << filename << " (" << temp.rows << "x" << temp.cols << ")" << std::endl;
+				std::vector<cv::KeyPoint> kp;
+				detector->detect(temp, kp);
+				std::cerr << "Detected." << std::endl;
+				if (validateKPs)
+				{
+					validateKeypoints(kp, getMask(name));
+					std::cerr << "Validated." << std::endl;
+					if (kp.size() == 0) {continue;}
+				}
+				extractor->compute(temp, kp, desc);
+				std::cerr << "Computed." << std::endl;
+
+				draw_keypoints(temp, kp);
+				cv::imshow("test", temp);
+				cv::imwrite("/home/arprice/Desktop/kaze" + name + ".jpg", temp);
+				cv::waitKey();
+				trainer->add(desc);
+			}
 		}
 		std::cout << "Clustering...";
 		vocabulary = trainer->cluster();
@@ -124,54 +150,48 @@ public:
 		return vocabulary;
 	}
 
-	std::map<std::string, cv::SVM> trainSVMs(const std::string& trainingPath,
+	std::map<std::string, cv::SVM> trainSVMs(TrainingSet& t,
 											 const cv::Ptr<cv::FeatureDetector> detector,
 											 cv::Ptr<cv::BOWImgDescriptorExtractor> imgExtractor,
 											 const bool lookForSavedSVMs = true,
-											 const bool saveTrainedSVMs = true)
+											 const bool saveTrainedSVMs = true,
+											 const bool validateKPs = true)
 	{
 		std::map<std::string, cv::SVM> svms;
 		std::map<std::string, cv::Mat> posFeatures, negFeatures;
 		std::vector<std::string> categories;
 
-		boost::filesystem3::recursive_directory_iterator trainDir(trainingPath);
-
 		cv::SVMParams svmParams;
-		svmParams.kernel_type = cv::SVM::RBF;
+		//svmParams.kernel_type = cv::SVM::RBF;
+		svmParams.kernel_type = cv::SVM::LINEAR;
 
 		// Load categories and positive samples
-		std::string currentCategory;
-		for(boost::filesystem3::recursive_directory_iterator end_iter; trainDir != end_iter; ++trainDir)
+		for (TrainingSet::iterator catIter = t.begin();
+			 catIter != t.end(); ++catIter)
 		{
-			if(trainDir.level() == 0)
+			std::string currentCategory = catIter->first;
+			categories.push_back(currentCategory);
+
+			svms.insert(std::pair<std::string, cv::SVM>(currentCategory, cv::SVM()));
+			std::cerr << currentCategory << std::endl;
+
+			if (lookForSavedSVMs && boost::filesystem3::exists(BASE_PATH + "/" + currentCategory + "_svm.xml"))
 			{
-				// Get category name from name of the folder
-				currentCategory = (trainDir->path()).filename().string();
-				categories.push_back(currentCategory);
-
-				svms.insert(std::pair<std::string, cv::SVM>(currentCategory, cv::SVM()));
-				std::cerr << currentCategory << std::endl;
-
-				if (lookForSavedSVMs && boost::filesystem3::exists(trainingPath + currentCategory + "/svm.xml"))
-				{
-					svms[currentCategory].load((trainingPath + currentCategory + "/svm.xml").c_str());
-					std::cerr << svms[currentCategory].get_support_vector_count() << std::endl;
-				}
-				else
-				{
-					posFeatures.insert(std::pair<std::string, cv::Mat>(currentCategory, cv::Mat()));
-					negFeatures.insert(std::pair<std::string, cv::Mat>(currentCategory, cv::Mat()));
-				}
+				svms[currentCategory].load((BASE_PATH + "/" + currentCategory + "_svm.xml").c_str());
+				std::cerr << svms[currentCategory].get_support_vector_count() << std::endl;
 			}
 			else
 			{
-				if ((trainDir->path()).filename().string() == "Thumbs.db") {continue;}
-				if ((trainDir->path()).filename().string() == "svm.xml") {continue;}
+				posFeatures.insert(std::pair<std::string, cv::Mat>(currentCategory, cv::Mat()));
+				negFeatures.insert(std::pair<std::string, cv::Mat>(currentCategory, cv::Mat()));
+			}
+
+			for (std::string name : catIter->second)
+			{
 				if (svms[currentCategory].get_support_vector_count() > 0) {continue;} // SVM already trained.
 
 				// File name with path
-				std::string filename = trainDir->path().parent_path().string() + std::string("/")
-						+ (trainDir->path()).filename().string();
+				std::string filename = VOC_FILE_STRUCTURE.imgDir() + "/" + name + ".jpg";
 
 				cv::Mat tmp = cv::imread(filename);
 				cv::Mat desc;
@@ -179,6 +199,11 @@ public:
 				// Compute the actual feature
 				std::vector<cv::KeyPoint> kp;
 				detector->detect(tmp, kp);
+				if (validateKPs)
+				{
+					validateKeypoints(kp, getMask(name));
+					if (kp.size() == 0) {continue;}
+				}
 				imgExtractor->compute(tmp, kp, desc);
 
 				std::cout << "Creating feature: " << filename << " (" << desc.rows << "x" << desc.cols << ")" << std::endl;
@@ -216,6 +241,7 @@ public:
 			}
 		}
 
+		bool fireOnce = true;
 		// Train SVMs for each class
 		for (std::string category : categories)
 		{
@@ -234,6 +260,13 @@ public:
 
 			svms[category].train(trainData, trainLabels, cv::Mat(), cv::Mat(), svmParams);
 			std::cout << "Done." << std::endl;
+
+			if (fireOnce)
+			{
+				fireOnce = false;
+				std::cerr << trainData << std::endl;
+				std::cerr << trainLabels << std::endl;
+			}
 		}
 
 		// Save svms
@@ -242,7 +275,7 @@ public:
 			for (std::map<std::string, cv::SVM>::iterator iter = svms.begin();
 				 iter != svms.end(); ++iter)
 			{
-				std::string svmFilename = BASE_PATH + TRAINING_PATH + iter->first + "/svm.xml";
+				std::string svmFilename = BASE_PATH + "/" + iter->first + "_svm.xml";
 				iter->second.save(svmFilename.c_str());
 			}
 		}
@@ -253,22 +286,22 @@ public:
 
 	void TestCluster()
 	{
-		cv::Ptr<cv::FeatureDetector> detector(new cv::SurfFeatureDetector());
-		cv::Ptr<cv::DescriptorExtractor> extractor(new cv::SurfDescriptorExtractor());
+		cv::Ptr<cv::FeatureDetector> detector(new cv::KazeFeatureDetector());
+		cv::Ptr<cv::DescriptorExtractor> extractor(new cv::KazeDescriptorExtractor());
 		cv::Ptr<cv::DescriptorMatcher> matcher(new cv::FlannBasedMatcher());
 
 		cv::Ptr<cv::BOWTrainer> trainer(new cv::BOWKMeansTrainer(BOW_FEATURE_SIZE));
 		cv::Ptr<cv::BOWImgDescriptorExtractor> imgExtractor(new cv::BOWImgDescriptorExtractor(extractor, matcher));
 
+		TrainingSet collections;
+		readVOCLists(VOC_FILE_STRUCTURE.setDir(), collections, 5);
 
-		boost::filesystem3::directory_iterator templateDir(BASE_PATH + TEMPLATES_PATH);
-
-		cv::Mat vocabulary = buildVocabulary(templateDir, detector, extractor, trainer, false);
+		cv::Mat vocabulary = buildVocabulary(collections, detector, extractor, trainer, false);
 		std::cout << "Vocab: " << " (" << vocabulary.rows << "x" << vocabulary.cols << ")" << std::endl;
 
 		imgExtractor->setVocabulary(vocabulary);
 
-		std::map<std::string, cv::SVM> svms = trainSVMs(BASE_PATH + TRAINING_PATH, detector, imgExtractor, false);
+		std::map<std::string, cv::SVM> svms = trainSVMs(collections, detector, imgExtractor, false);
 
 		// Do the testing set
 		boost::filesystem3::directory_iterator testIter(BASE_PATH + TESTING_PATH);
@@ -294,8 +327,6 @@ public:
 			{
 				std::cout << "\t" <<iter->first << ": " << iter->second.predict(desc, true) << std::endl;
 			}
-
-
 		}
 	}
 };
