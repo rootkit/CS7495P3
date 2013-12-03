@@ -51,7 +51,7 @@
 
 #include <boost/filesystem.hpp>
 
-const int BOW_FEATURE_SIZE = 5;
+const int BOW_FEATURE_SIZE = 16;
 const std::string BASE_PATH = "/home/arprice/Desktop/bow/";
 const std::string TEMPLATES_PATH = "templates/";
 const std::string TRAINING_PATH = "training/";
@@ -136,6 +136,9 @@ public:
 
 		boost::filesystem3::recursive_directory_iterator trainDir(trainingPath);
 
+		cv::SVMParams svmParams;
+		svmParams.kernel_type = cv::SVM::RBF;
+
 		// Load categories and positive samples
 		std::string currentCategory;
 		for(boost::filesystem3::recursive_directory_iterator end_iter; trainDir != end_iter; ++trainDir)
@@ -187,19 +190,28 @@ public:
 		// Create negative samples from the positive samples of other classes
 		for (std::string category : categories)
 		{
-			if (svms[currentCategory].get_support_vector_count() > 0) {continue;} // SVM already trained.
+			if (svms[category].get_support_vector_count() > 0) {continue;} // SVM already trained.
 
 			for (std::map<std::string, cv::Mat>::iterator iter = posFeatures.begin();
 				 iter != posFeatures.end(); ++iter)
 			{
 				if (iter->first != category)
 				{
-					std::cerr << "Adding " << iter->first << std::endl;
-					negFeatures[category].push_back(iter->second);
+					std::cout << "Adding negative examples: " << iter->first << std::endl;
+					if (negFeatures[category].rows == 0)
+					{
+						negFeatures[category] = iter->second;
+					}
+					else
+					{
+						cv::vconcat(negFeatures[category],
+									iter->second,
+									negFeatures[category]);
+					}
 				}
 				else
 				{
-					std::cerr << "Not Adding " << iter->first << std::endl;
+					std::cout << "Not Adding " << iter->first << std::endl;
 				}
 			}
 		}
@@ -207,7 +219,7 @@ public:
 		// Train SVMs for each class
 		for (std::string category : categories)
 		{
-			if (svms[currentCategory].get_support_vector_count() > 0) {continue;} // SVM already trained.
+			if (svms[category].get_support_vector_count() > 0) {continue;} // SVM already trained.
 
 			cv::Mat trainData;
 			cv::Mat trainLabels;
@@ -220,7 +232,7 @@ public:
 						cv::Mat::zeros(negFeatures[category].rows, 1, CV_32S), // Negative training data has label 0
 						trainLabels);
 
-			svms[category].train(trainData, trainLabels);
+			svms[category].train(trainData, trainLabels, cv::Mat(), cv::Mat(), svmParams);
 			std::cout << "Done." << std::endl;
 		}
 
@@ -280,7 +292,7 @@ public:
 			for (std::map<std::string, cv::SVM>::iterator iter = svms.begin();
 				 iter != svms.end(); ++iter)
 			{
-				std::cout << "\t" <<iter->first << ": " << iter->second.predict(desc) << std::endl;
+				std::cout << "\t" <<iter->first << ": " << iter->second.predict(desc, true) << std::endl;
 			}
 
 
