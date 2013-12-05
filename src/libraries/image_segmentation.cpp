@@ -226,5 +226,17 @@ void recolorSegmentation(const cv::Mat& colorIm, cv::Mat& recolorIm, const Segme
 	}
 }
 
+void getSegmentMask(const Segmentation& s, const int segmentIdx, cv::Mat& mask)
+{
+	int numPixels = s.pixelsToSegment.rows * s.pixelsToSegment.cols;
+
+	mask = cv::Mat::zeros(s.pixelsToSegment.size(), s.pixelsToSegment.type());
+
+	for (int i = 0; i < numPixels; ++i)
+	{
+		mask.data[i] = (s.pixelsToSegment.data[i] == segmentIdx) ? 255 : 0;
+	}
+}
+
 
 }

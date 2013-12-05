@@ -68,6 +68,8 @@ void segmentFelzenszwalb(const cv::Mat& input, Segmentation& s, const float c, u
 
 void recolorSegmentation(const cv::Mat& colorIm, cv::Mat& recolorIm, const Segmentation &s, bool useAverageColor = false, bool drawEdges = true);
 
+void getSegmentMask(const Segmentation& s, const int segmentIdx, cv::Mat& mask);
+
 }
 
 #endif // IMAGESEGMENTATION_H
