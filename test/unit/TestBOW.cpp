@@ -10,9 +10,6 @@
  * Copyright (c) 2013, Georgia Tech Research Corporation
  * All rights reserved.
  *
- * Humanoid Robotics Lab Georgia Institute of Technology
- * Director: Mike Stilman http://www.golems.org
- *
  * This file is provided under the following "BSD-style" License:
  * Redistribution and use in source and binary forms, with or
  * without modification, are permitted provided that the following
@@ -55,8 +52,9 @@
 #include <KazeDescriptorExtractor.h>
 
 #include "voc_utils.h"
+#include "caltech101_utils.h"
 
-const int BOW_FEATURE_SIZE = 16;
+const int BOW_FEATURE_SIZE = 32;
 const std::string BASE_PATH = "/home/arprice/Desktop/bow/";
 //const std::string TEMPLATES_PATH = "templates/";
 //const std::string TRAINING_PATH = "training/";
@@ -79,6 +77,65 @@ public:
 	}
 
 	virtual void tearDown () {}
+
+	// Creates a 1/n subset of the data with offset o
+	TrainingSet fold(TrainingSet& ts, int n, int o = 0, bool removeFromOriginal = false)
+	{
+		TrainingSet newSet;
+		for (TrainingSet::iterator catIter = ts.begin();
+			 catIter != ts.end(); ++catIter)
+		{
+			int count = 0;
+			std::set<std::vector<std::string>::iterator> rmIters;
+			newSet.insert(std::pair<std::string, std::vector<std::string> >(catIter->first, std::vector<std::string>()));
+			//for (std::string name : catIter->second)
+			for (std::vector<std::string>::iterator fileIter = catIter->second.begin();
+				 fileIter != catIter->second.end(); ++fileIter)
+			{
+				if (count % n == o)
+				{
+					std::string name = *fileIter;
+					newSet[catIter->first].push_back(name);
+					if (removeFromOriginal)
+					{
+						rmIters.insert(fileIter);
+					}
+				}
+				++count;
+			}
+
+			if (removeFromOriginal)
+			{
+				for (std::set<std::vector<std::string>::iterator>::iterator fileIter = rmIters.begin();
+					 fileIter != rmIters.end(); ++fileIter)
+				{
+					catIter->second.erase(*fileIter);
+				}
+			}
+		}
+		return newSet;
+	}
+
+	void setSVMTrainAutoParams( cv::ParamGrid& c_grid, cv::ParamGrid& gamma_grid,
+								cv::ParamGrid& p_grid, cv::ParamGrid& nu_grid,
+								cv::ParamGrid& coef_grid, cv::ParamGrid& degree_grid )
+	{
+		c_grid = cv::SVM::get_default_grid(cv::SVM::C);
+
+		gamma_grid = cv::SVM::get_default_grid(cv::SVM::GAMMA);
+
+		p_grid = cv::SVM::get_default_grid(cv::SVM::P);
+		p_grid.step = 0;
+
+		nu_grid = cv::SVM::get_default_grid(cv::SVM::NU);
+		nu_grid.step = 0;
+
+		coef_grid = cv::SVM::get_default_grid(cv::SVM::COEF);
+		coef_grid.step = 0;
+
+		degree_grid = cv::SVM::get_default_grid(cv::SVM::DEGREE);
+		degree_grid.step = 0;
+	}
 
 	cv::Mat buildVocabulary(TrainingSet& t,
 							const cv::Ptr<cv::FeatureDetector> detector,
@@ -110,7 +167,8 @@ public:
 		{
 			for (std::string name : catIter->second)
 			{
-				std::string filename = VOC_FILE_STRUCTURE.imgDir() + "/" + name + ".jpg";
+				//std::string filename = VOC_FILE_STRUCTURE.imgDir() + "/" + name + ".jpg";
+				std::string filename = name;
 				cv::Mat temp = cv::imread(filename);
 
 				assert(temp.rows > 0 && temp.cols > 0);
@@ -118,20 +176,19 @@ public:
 				std::cout << "Loaded: " << filename << " (" << temp.rows << "x" << temp.cols << ")" << std::endl;
 				std::vector<cv::KeyPoint> kp;
 				detector->detect(temp, kp);
-				std::cerr << "Detected." << std::endl;
 				if (validateKPs)
 				{
 					validateKeypoints(kp, getMask(name));
-					std::cerr << "Validated." << std::endl;
-					if (kp.size() == 0) {continue;}
 				}
+				if (kp.size() == 0) {continue;}
 				extractor->compute(temp, kp, desc);
-				std::cerr << "Computed." << std::endl;
 
-				draw_keypoints(temp, kp);
-				cv::imshow("test", temp);
-				cv::imwrite("/home/arprice/Desktop/kaze" + name + ".jpg", temp);
-				cv::waitKey();
+				assert(kp.size() > 0);
+
+//				draw_keypoints(temp, kp);
+//				cv::imshow("test", temp);
+//				cv::imwrite("/home/arprice/Desktop/kaze" + name + ".jpg", temp);
+//				cv::waitKey();
 				trainer->add(desc);
 			}
 		}
@@ -162,8 +219,9 @@ public:
 		std::vector<std::string> categories;
 
 		cv::SVMParams svmParams;
-		//svmParams.kernel_type = cv::SVM::RBF;
-		svmParams.kernel_type = cv::SVM::LINEAR;
+		svmParams.svm_type = CvSVM::C_SVC;
+		svmParams.kernel_type = cv::SVM::RBF;
+		//svmParams.kernel_type = cv::SVM::LINEAR;
 
 		// Load categories and positive samples
 		for (TrainingSet::iterator catIter = t.begin();
@@ -191,7 +249,8 @@ public:
 				if (svms[currentCategory].get_support_vector_count() > 0) {continue;} // SVM already trained.
 
 				// File name with path
-				std::string filename = VOC_FILE_STRUCTURE.imgDir() + "/" + name + ".jpg";
+				//std::string filename = VOC_FILE_STRUCTURE.imgDir() + "/" + name + ".jpg";
+				std::string filename = name;
 
 				cv::Mat tmp = cv::imread(filename);
 				cv::Mat desc;
@@ -202,8 +261,8 @@ public:
 				if (validateKPs)
 				{
 					validateKeypoints(kp, getMask(name));
-					if (kp.size() == 0) {continue;}
 				}
+				if (kp.size() == 0) {continue;}
 				imgExtractor->compute(tmp, kp, desc);
 
 				std::cout << "Creating feature: " << filename << " (" << desc.rows << "x" << desc.cols << ")" << std::endl;
@@ -217,26 +276,43 @@ public:
 		{
 			if (svms[category].get_support_vector_count() > 0) {continue;} // SVM already trained.
 
-			for (std::map<std::string, cv::Mat>::iterator iter = posFeatures.begin();
-				 iter != posFeatures.end(); ++iter)
+			std::cerr << "Creating - examples for " << category << std::endl;
+//			if (category != "BACKGROUND_Google")
+//			{
+//				negFeatures[category] = posFeatures["BACKGROUND_Google"];
+//			}
+
 			{
-				if (iter->first != category)
+				for (std::map<std::string, cv::Mat>::iterator iter = posFeatures.begin();
+					 iter != posFeatures.end(); ++iter)
 				{
-					std::cout << "Adding negative examples: " << iter->first << std::endl;
-					if (negFeatures[category].rows == 0)
+					if (iter->first != category)
 					{
-						negFeatures[category] = iter->second;
+						std::cout << "Adding negative examples: " << iter->first << std::endl;
+						if (negFeatures[category].rows == 0)
+						{
+							negFeatures[category] = iter->second;
+						}
+						else
+						{
+							if (iter->first != "BACKGROUND_Google")
+							{
+								cv::vconcat(negFeatures[category],
+											iter->second.rowRange(1,3),
+											negFeatures[category]);
+							}
+							else
+							{
+								cv::vconcat(negFeatures[category],
+											iter->second,
+											negFeatures[category]);
+							}
+						}
 					}
 					else
 					{
-						cv::vconcat(negFeatures[category],
-									iter->second,
-									negFeatures[category]);
+						std::cout << "Not Adding " << iter->first << std::endl;
 					}
-				}
-				else
-				{
-					std::cout << "Not Adding " << iter->first << std::endl;
 				}
 			}
 		}
@@ -250,15 +326,22 @@ public:
 			cv::Mat trainData;
 			cv::Mat trainLabels;
 
+			assert(posFeatures[category].data != NULL && negFeatures[category].data != NULL);
+			assert(posFeatures[category].cols == negFeatures[category].cols);
+
 			std::cout << "Creating +/- training data for " << category << "...";
 			cv::vconcat(posFeatures[category],
 						negFeatures[category],
 						trainData);
 			cv::vconcat(cv::Mat::ones(posFeatures[category].rows, 1, CV_32S), // Positive training data has label 1
-						cv::Mat::zeros(negFeatures[category].rows, 1, CV_32S), // Negative training data has label 0
+						-cv::Mat::ones(negFeatures[category].rows, 1, CV_32S), // Negative training data has label -1
 						trainLabels);
 
-			svms[category].train(trainData, trainLabels, cv::Mat(), cv::Mat(), svmParams);
+			cv::ParamGrid c_grid, gamma_grid, p_grid, nu_grid, coef_grid, degree_grid;
+			setSVMTrainAutoParams( c_grid, gamma_grid,  p_grid, nu_grid, coef_grid, degree_grid );
+			svms[category].train_auto( trainData, trainLabels, cv::Mat(), cv::Mat(), svmParams, 10, c_grid, gamma_grid, p_grid, nu_grid, coef_grid, degree_grid );
+
+			//svms[category].train(trainData, trainLabels, cv::Mat(), cv::Mat(), svmParams);
 			std::cout << "Done." << std::endl;
 
 			if (fireOnce)
@@ -284,50 +367,149 @@ public:
 
 	}
 
+	cv::Mat testSVMs(TrainingSet& t,
+					 const cv::Ptr<cv::FeatureDetector> detector,
+					 cv::Ptr<cv::BOWImgDescriptorExtractor> imgExtractor,
+					 const std::map<std::string, cv::SVM>& svms)
+	{
+		cv::Mat confusion = cv::Mat::zeros(t.size()-1, t.size()-1, CV_32FC1);
+
+		std::map<std::string, int> catMap;
+		int catCount = 0;
+
+		for (TrainingSet::iterator catIter = t.begin();
+			 catIter != t.end(); ++catIter)
+		{
+			catMap.insert(std::pair<std::string, int>(catIter->first, catCount++));
+			std::cout << catIter->first << "','";
+		}
+		std::cout << std::endl;
+
+		for (TrainingSet::iterator catIter = t.begin();
+			 catIter != t.end(); ++catIter)
+		{
+			if (catIter->first == "BACKGROUND_Google") { continue; }
+
+			for (std::string name : catIter->second)
+			{
+				std::string filename = name;
+				cv::Mat tmp = cv::imread(filename);
+
+				cv::Mat desc;
+
+				// Compute the actual feature
+				std::vector<cv::KeyPoint> kp;
+				detector->detect(tmp, kp);
+				imgExtractor->compute(tmp, kp, desc);
+
+				//float maxPrediction = -100;
+				float minPrediction =  100;
+
+				//std::string maxClass;
+				std::string minClass;
+
+				// Classify it
+				for (std::map<std::string, cv::SVM>::const_iterator iter = svms.begin();
+					 iter != svms.end(); ++iter)
+				{
+					if (iter->first == "BACKGROUND_Google") {continue;}
+					float prediction = iter->second.predict(desc, true);
+					//if (prediction > maxPrediction) { maxPrediction = prediction; maxClass = iter->first; }
+					if (prediction < minPrediction) { minPrediction = prediction; minClass = iter->first; }
+					//std::cout << "\t" <<iter->first << ": " << prediction << std::endl;
+				}
+				bool correct = catIter->first == minClass;
+				if (correct)
+				{
+					std::cout << "^^^^^^^^Correct: " << minClass << std::endl;
+				}
+				else
+				{
+					std::cout << "~~~~~~~~Incorrect: " << minClass << std::endl;
+				}
+
+				// Increment this element in the confusion matrix
+				confusion.at<float>(catMap[catIter->first] * confusion.cols + catMap[minClass]) += 1;
+				std::cout << std::endl;
+				//cv::imwrite(BASE_PATH + TESTING_PATH + minClass + std::to_string(rand()%1000) + ".jpg", tmp);
+			}
+		}
+
+		return confusion;
+	}
+
+	//std::string getConfusionLaTeX(cv::Mat confusion, )
+
 	void TestCluster()
 	{
-		cv::Ptr<cv::FeatureDetector> detector(new cv::KazeFeatureDetector());
-		cv::Ptr<cv::DescriptorExtractor> extractor(new cv::KazeDescriptorExtractor());
+		cv::Ptr<cv::FeatureDetector> detector(new cv::SiftFeatureDetector());
+		cv::Ptr<cv::DescriptorExtractor> extractor(new cv::SiftDescriptorExtractor());
 		cv::Ptr<cv::DescriptorMatcher> matcher(new cv::FlannBasedMatcher());
 
 		cv::Ptr<cv::BOWTrainer> trainer(new cv::BOWKMeansTrainer(BOW_FEATURE_SIZE));
 		cv::Ptr<cv::BOWImgDescriptorExtractor> imgExtractor(new cv::BOWImgDescriptorExtractor(extractor, matcher));
 
-		TrainingSet collections;
-		readVOCLists(VOC_FILE_STRUCTURE.setDir(), collections, 5);
+		TrainingSet collections, templates, tests;
+		//readVOCLists(VOC_FILE_STRUCTURE.setDir(), collections, 5);
+		loadCT101("/media/Data/101_ObjectCategories/", collections, 20, 100);
 
-		cv::Mat vocabulary = buildVocabulary(collections, detector, extractor, trainer, false);
+		templates = fold(collections, 5, 0, true);
+
+		tests = fold(collections, 10, 0, true);
+
+		cv::Mat vocabulary = buildVocabulary(templates, detector, extractor, trainer, true, true, false);
 		std::cout << "Vocab: " << " (" << vocabulary.rows << "x" << vocabulary.cols << ")" << std::endl;
 
 		imgExtractor->setVocabulary(vocabulary);
 
-		std::map<std::string, cv::SVM> svms = trainSVMs(collections, detector, imgExtractor, false);
+		std::map<std::string, cv::SVM> svms = trainSVMs(collections, detector, imgExtractor, true, true, false);
+
+		cv::Mat confusion = testSVMs(tests, detector, imgExtractor, svms);
+
+		//cv::Mat confusion(counts.size(), counts.type());
+		for (int i = confusion.rows - 1; i >= 0; i--)
+		{
+			//cv::normalize(counts.row(i), cv::_OutputArray(confusion.ptr(i), confusion.cols));
+			cv::normalize(confusion.row(i), confusion.row(i));
+		}
+
+		std::cout << confusion << std::endl;
+
+		confusion *= 255.0;
+		cv::cvtColor(confusion, confusion, CV_GRAY2RGB);
+		confusion.convertTo(confusion, CV_8UC3);
+
+		cv::namedWindow("confusion", CV_WINDOW_NORMAL);
+		cv::imwrite(BASE_PATH + TESTING_PATH + "confusion.jpg", confusion);
+
+		cv::imshow("confusion", confusion);
+		cv::waitKey();
 
 		// Do the testing set
-		boost::filesystem3::directory_iterator testIter(BASE_PATH + TESTING_PATH);
-		for (boost::filesystem3::directory_iterator end; testIter != end; ++testIter)
-		{
-			// Compute BoW feature for image
-			std::string filename = testIter->path().parent_path().string() + std::string("/")
-					+ (testIter->path()).filename().string();
+//		boost::filesystem3::directory_iterator testIter(BASE_PATH + TESTING_PATH);
+//		for (boost::filesystem3::directory_iterator end; testIter != end; ++testIter)
+//		{
+//			// Compute BoW feature for image
+//			std::string filename = testIter->path().parent_path().string() + std::string("/")
+//					+ (testIter->path()).filename().string();
 
-			cv::Mat tmp = cv::imread(filename);
-			cv::Mat desc;
+//			cv::Mat tmp = cv::imread(filename);
+//			cv::Mat desc;
 
-			// Compute the actual feature
-			std::vector<cv::KeyPoint> kp;
-			detector->detect(tmp, kp);
-			imgExtractor->compute(tmp, kp, desc);
+//			// Compute the actual feature
+//			std::vector<cv::KeyPoint> kp;
+//			detector->detect(tmp, kp);
+//			imgExtractor->compute(tmp, kp, desc);
 
-			std::cout << (testIter->path()).filename().string() << ":" << std::endl;
+//			std::cout << (testIter->path()).filename().string() << ":" << std::endl;
 
-			// Classify it
-			for (std::map<std::string, cv::SVM>::iterator iter = svms.begin();
-				 iter != svms.end(); ++iter)
-			{
-				std::cout << "\t" <<iter->first << ": " << iter->second.predict(desc, true) << std::endl;
-			}
-		}
+//			// Classify it
+//			for (std::map<std::string, cv::SVM>::iterator iter = svms.begin();
+//				 iter != svms.end(); ++iter)
+//			{
+//				std::cout << "\t" <<iter->first << ": " << iter->second.predict(desc, true) << std::endl;
+//			}
+//		}
 	}
 };
 

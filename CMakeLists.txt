@@ -1,8 +1,8 @@
 cmake_minimum_required(VERSION 2.8.3)
 project(fuzzy_opj)
 set(BUILD_FLAGS "-std=c++0x -Wreturn-type")
-SET(CMAKE_BUILD_TYPE "Release")
-#SET(CMAKE_BUILD_TYPE "Debug")
+#SET(CMAKE_BUILD_TYPE "Release")
+SET(CMAKE_BUILD_TYPE "Debug")
 
 # Add additional CMake files
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_CURRENT_SOURCE_DIR}/cmake/")
@@ -43,6 +43,7 @@ add_library(${PROJECT_NAME}
   src/libraries/KazeFeatureDetector.cpp
   src/libraries/KazeDescriptorExtractor.cpp
   src/libraries/voc_utils.cpp
+  src/libraries/caltech101_utils.cpp
   ${felz_source})
 
 set_target_properties(${PROJECT_NAME} PROPERTIES COMPILE_FLAGS ${BUILD_FLAGS})
@@ -64,10 +65,10 @@ file(GLOB system_tests_source "test/system/*.cpp")
 list(SORT system_tests_source)
 
 # Build full unit test
-add_executable(TestAllUnits "test/test_units.cpp" ${unit_tests_source})
-add_test(TestAllUnits ${EXECUTABLE_OUTPUT_PATH}/TestAllUnits)
-target_link_libraries(TestAllUnits ${PROJECT_NAME})
-set_target_properties(TestAllUnits PROPERTIES COMPILE_FLAGS ${BUILD_FLAGS})
+#add_executable(TestAllUnits "test/test_units.cpp" ${unit_tests_source})
+#add_test(TestAllUnits ${EXECUTABLE_OUTPUT_PATH}/TestAllUnits)
+#target_link_libraries(TestAllUnits ${PROJECT_NAME})
+#set_target_properties(TestAllUnits PROPERTIES COMPILE_FLAGS ${BUILD_FLAGS})
 
 # Build standalone unit tests
 message(STATUS "\n-- UNIT TESTS: ")

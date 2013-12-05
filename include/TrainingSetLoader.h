@@ -1,9 +1,9 @@
 /**
- * \file voc_utils.h
+ * \file TrainingSetLoader.h
  * \brief
  *
  * \author Andrew Price
- * \date 12 2, 2013
+ * \date 12 3, 2013
  *
  * \copyright
  *
@@ -38,47 +38,17 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef VOC_UTILS_H
-#define VOC_UTILS_H
+#ifndef TRAININGSETLOADER_H
+#define TRAININGSETLOADER_H
 
 #include <string>
 #include <vector>
 #include <map>
 
-#include <opencv2/core/core.hpp>
-#include <opencv2/features2d/features2d.hpp>
+/**
+ * @brief TrainingSet contains sets of files keyed by their category
+ */
+typedef std::map<std::string, std::vector<std::string> > TrainingSet;
+typedef float (*TrainingSetLoader)(const std::string directory, TrainingSet& collections, int numCategories, int numExamples);
 
-#include "TrainingSetLoader.h"
-
-class VOCFileStructure
-{
-public:
-	VOCFileStructure()
-	{
-		baseDir = "/media/HOME/VOCdevkit/VOC2012/";
-		imgDirRel = "JPEGImages/";
-		setDirRel = "ImageSets/Main/";
-		maskDirRel = "SegmentationObject/";
-	}
-
-	std::string baseDir;
-	std::string imgDirRel;
-	std::string setDirRel;
-	std::string maskDirRel;
-
-	std::string imgDir() const { return baseDir + imgDirRel; }
-	std::string setDir() const { return baseDir + setDirRel; }
-	std::string maskDir() const { return baseDir + maskDirRel; }
-};
-
-extern const VOCFileStructure VOC_FILE_STRUCTURE;
-
-void getMemberList(const std::string& filename, std::vector<std::string>& files, int numToRead = -1);
-
-void readVOCLists(const std::string directory, TrainingSet& collections, int numToRead = -1);
-
-cv::Mat getMask(const std::string filename, int dilationRadius = 3);
-
-void validateKeypoints(std::vector<cv::KeyPoint>& kps, const cv::Mat& mask);
-
-#endif // VOC_UTILS_H
+#endif // TRAININGSETLOADER_H

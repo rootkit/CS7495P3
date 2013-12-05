@@ -1,9 +1,9 @@
 /**
- * \file voc_utils.h
+ * \file caltech101_utils.cpp
  * \brief
  *
  * \author Andrew Price
- * \date 12 2, 2013
+ * \date 12 3, 2013
  *
  * \copyright
  *
@@ -38,47 +38,42 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef VOC_UTILS_H
-#define VOC_UTILS_H
+#include "caltech101_utils.h"
 
-#include <string>
-#include <vector>
-#include <map>
+#include <boost/filesystem.hpp>
 
-#include <opencv2/core/core.hpp>
-#include <opencv2/features2d/features2d.hpp>
-
-#include "TrainingSetLoader.h"
-
-class VOCFileStructure
+void loadCT101(const std::string directory, TrainingSet& collections, int numCategories, int numExamples)
 {
-public:
-	VOCFileStructure()
+	boost::filesystem3::recursive_directory_iterator trainDir(directory);
+	int numCat = 0;
+	int numEx = 0;
+
+	// Load categories and positive samples
+	std::string currentCategory;
+	for(boost::filesystem3::recursive_directory_iterator end_iter; trainDir != end_iter; ++trainDir)
 	{
-		baseDir = "/media/HOME/VOCdevkit/VOC2012/";
-		imgDirRel = "JPEGImages/";
-		setDirRel = "ImageSets/Main/";
-		maskDirRel = "SegmentationObject/";
+		if(trainDir.level() == 0)
+		{
+			// Get category name from name of the folder
+			currentCategory = (trainDir->path()).filename().string();
+
+			if (numCategories > 0 && numCat >= numCategories) {break;}
+			++numCat;
+
+			collections.insert(std::pair<std::string, std::vector<std::string> >(currentCategory, std::vector<std::string>()));
+
+			numEx = 0;
+		}
+		else
+		{
+			if (numExamples < 0 || numEx < numExamples)
+			{
+				// File name with path
+				std::string filename = trainDir->path().parent_path().string() + "/" + (trainDir->path()).filename().string();
+
+				collections[currentCategory].push_back(filename);
+				++numEx;
+			}
+		}
 	}
-
-	std::string baseDir;
-	std::string imgDirRel;
-	std::string setDirRel;
-	std::string maskDirRel;
-
-	std::string imgDir() const { return baseDir + imgDirRel; }
-	std::string setDir() const { return baseDir + setDirRel; }
-	std::string maskDir() const { return baseDir + maskDirRel; }
-};
-
-extern const VOCFileStructure VOC_FILE_STRUCTURE;
-
-void getMemberList(const std::string& filename, std::vector<std::string>& files, int numToRead = -1);
-
-void readVOCLists(const std::string directory, TrainingSet& collections, int numToRead = -1);
-
-cv::Mat getMask(const std::string filename, int dilationRadius = 3);
-
-void validateKeypoints(std::vector<cv::KeyPoint>& kps, const cv::Mat& mask);
-
-#endif // VOC_UTILS_H
+}

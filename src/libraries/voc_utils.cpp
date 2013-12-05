@@ -79,7 +79,7 @@ void getMemberList(const std::string& filename, std::vector<std::string>& files,
 	}
 }
 
-void readVOCLists(const std::string directory, std::map<std::string, std::vector<std::string> >& collections, int numToRead)
+void readVOCLists(const std::string directory, TrainingSet& collections, int numToRead)
 {
 	int numRead = 0;
 	boost::filesystem3::directory_iterator iter(directory);
